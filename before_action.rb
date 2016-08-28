@@ -1,57 +1,50 @@
 module Utils
   module Callbacks
-    def before_action *methods, &blk
-      @@___new_methods ||= []
-      @@___callbacks ||= {}
-      @@___callbacks[blk] = []
-      methods.each do |m|
-        @@___callbacks[blk] << m
-      end
+    def before_action(hook, *names)
+      @___before ||= Hash.new([])
+      names.each { |n| @___before[n] += [hook] }
     end
 
-    def method_added name
-      return if @@___new_methods.include? name
-      @@___callbacks.each do |blk, methods|
-        if methods.include? name
-          hidden_original = "___#{name}".to_sym
-          @@___new_methods.concat [hidden_original, name]
-          alias_method hidden_original, name
-          define_method name do
-            blk.call
-            self.send hidden_original.to_sym
-          end
-          @@___callbacks[blk].delete name
-        end
+    def method_added(name)
+      return if !@___before || @___before[name].empty?
+      return if (@___methods_with_hooks ||= []).include?(name)
+
+      method = instance_method(name)
+      hooks = @___before[name]
+      @___methods_with_hooks << name
+
+      define_method(name) do |*args, &block|
+        hooks.each { |hook| send(hook) }
+        method.bind(self).call(*args, &block)
       end
     end
   end
 end
 
-class FilterTest
-  extend Utils::Callbacks
 
-  before_action :baz do
-    puts "before 1"
-  end
 
-  before_action :baz2 do
-    puts "before 2"
-  end
+# class FilterTest2
+#   extend Utils::Callbacks
 
-  def baz
-    puts "baz 1"
-  end
+#   before_action :hook, :baz3
+#   before_action :hook2, :baz3
 
-  def baz2
-    puts "baz 2"
-  end
-end
+#   def hook
+#     puts "HOOK 1: #{@inst}"
+#   end
+  
+#   def hook2
+#     puts "HOOK 2: #{@inst}"
+#   end
+  
+#   def initialize
+#     @inst = 111
+#   end
 
-# ft = FilterTest.new
-# ft.baz
-# ft.baz2
+#   def baz3
+#     puts "baz 3"
+#   end
+# end
 
-# before 1
-# baz 1
-# before 2
-# baz 2
+# ft2 = FilterTest2.new
+# ft2.baz3
