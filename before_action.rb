@@ -14,7 +14,7 @@ module Utils
       @___methods_with_hooks << name
 
       define_method(name) do |*args, &block|
-        hooks.each { |hook| send(hook) }
+        hooks.each { |hook| send(hook, *args) }
         method.bind(self).call(*args, &block)
       end
     end
